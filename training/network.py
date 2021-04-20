@@ -1596,8 +1596,10 @@ def G_synthesis(
     latents_num = k + int(
         transformer
     )  # if the transformer setted as true, latents_num = K+1
+    # latents_num = k local component + 1 global component?
     resolution_log2 = int(np.log2(resolution))  # number of scales
     num_layers = resolution_log2 * 2 - 1  # number of layers for generation
+    #
     if pos_dim is None:
         pos_dim = dlatent_size
 
@@ -1628,6 +1630,8 @@ def G_synthesis(
     dlatents_in.set_shape(
         [None, latents_num, num_layers, dlatent_size]
     )  # reshape the input
+    # dlatents_in [B, K+1, layers, dim]
+    # dlatents_in = Bs, latent_compoment, number_layers, dlatent_size
     component_mask.set_shape([None, 1, k])  # set the componentmask as [bs, 1, k]
     latent_pos.set_shape(
         [k, dlatent_size]
@@ -1698,11 +1702,19 @@ def G_synthesis(
         res = (layer_idx + 5) // 2
         # Global latent for features global modulation (as in StyleGAN)
         dlatent_global = get_global(dlatents_in, res)[:, layer_idx + 1]
+        # first index the global latent components, and then, index the global component in that layer
         # If bottom-up connections exist, use the (iteratively updated) latents
         # Otherwise, use the input latents corresponding to the current layer
         new_dlatents = None
         if dlatents is None:
+            # if dlatents is None, get the local latent components in that layer
             dlatents = dlatents_in[:, :-1, layer_idx + 1]
+            # else the latent code will be replaced by the input dlatents
+            # if the layer is the first time coded in this block or under this resolution
+            # the latent codes are extracted from the dlatents_in first time, within this block where
+            # the layer structure located, latent codes will be updated,
+            # In the next block of resoultion, the latent codes belong to this scale of resolution
+            # will be extracted and modified.
 
         # If local_attention, use it instead of convolution (not used by default)
         _fused_modconv, noconv = fused_modconv, False
