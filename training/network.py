@@ -1512,6 +1512,8 @@ def G_mapping(
     # Output
     x = tf.identity(x, name="dlatents_out")
     return x  # [batch_size, dlatent_broadcast, k (components_num), dlatent_dim]
+    # the orginal comments on size of the outputed tensor x is wrong according to the dlatent_broadcast scope.
+    # x should be [batch_size, k (components_num), dlatent_broadcast, dlatent_dim]
 
 
 ########################################## Synthesis network ##########################################
@@ -1656,7 +1658,7 @@ def G_synthesis(
     noise_layers = []
     for layer_idx in range(num_layers - 1):
         # Infer layer resolution from its index
-        res = (layer_idx + 5) // 2
+        res = (layer_idx + 5) // 2  # [2,3,3,4, 4, 5, 5, 6,6,7,7,8,8,9]
         batch_multiplier = 1
         if merge and res < m:
             batch_multiplier = k
@@ -1864,6 +1866,7 @@ def G_synthesis(
     def torgb(t, y, res, dlatents):  # res = 2..resolution_log2
         with tf.variable_scope("ToRGB"):
             if res == resolution_log2:
+                # for the last layer
                 # for k-GAN only: if didn't merge so far, merge now
                 if merge and resolution_log2 <= m:
                     with tf.variable_scope("merge%s" % (res)):
@@ -1882,6 +1885,7 @@ def G_synthesis(
                         )
 
             # Convert image features to output image (with num_channels, e.g. RGB)
+            #
             t = modulated_conv2d_layer(
                 t,
                 dlatents[:, res * 2 - 2],
@@ -2094,6 +2098,7 @@ def D_GANsformer(
         resolution_log2, pos_dim, pos_type, pos_directions_num, pos_init
     )
     if local_attention:
+        # not used by default
         att2d_grid = get_embeddings(3 * 3, 16, name="att2d_grid")
 
     # Convert input image (e.g. RGB) to image features
@@ -2232,6 +2237,7 @@ def D_GANsformer(
 
     # Main layers
     for res in range(resolution_log2, 2, -1):
+        # res = 8, 7, 6, 5, 4, 3 if resoultion 256 x 256
         with tf.variable_scope("%dx%d" % (2 ** res, 2 ** res)):
             # Optional skip/resnet connections (see StyleGAN)
             if architecture == "skip" or res == resolution_log2:
